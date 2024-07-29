@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload File</title>
+</head>
+<body>
+    <h1>Upload File</h1>
+    <form method="post" enctype="multipart/form-data">
+        <label for="file">Select file:</label>
+        <input type="file" id="file" name="file" required>
+        <br>
+        <button type="submit">Upload</button>
+    </form>
+    {% if filename %}
+        <p>Uploaded file: {{ filename }}</p>
+    {% endif %}
+    <p><a href="{{ url_for('index') }}">Back to Home</a></p>
+    <p><a href="{{ url_for('list_files') }}">View Uploaded Files</a></p>
+</body>
+</html>
