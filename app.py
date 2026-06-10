@@ -32,7 +32,6 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
-    otp_secret = db.Column(db.String(20), nullable=True)  # Store OTP secret
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -84,8 +83,7 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = generate_password_hash(request.form['password'])
-        otp_secret = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))  # Random secret
-        new_user = User(username=username, password=password, otp_secret=otp_secret)
+        new_user = User(username=username, password=password)
         db.session.add(new_user)
         db.session.commit()
         return redirect('/login')
