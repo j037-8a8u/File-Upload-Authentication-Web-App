@@ -1,11 +1,13 @@
 import os
 import random
 import string
+import time
 from flask import Flask, request, redirect, render_template, session, url_for, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from flask_mailman import Mail, EmailMessage
 import boto3
 
 app = Flask(__name__)
@@ -15,6 +17,12 @@ app.config['AWS_S3_BUCKET'] = 'your_bucket_name'
 app.config['AWS_ACCESS_KEY_ID'] = 'aws_access_key'
 app.config['AWS_SECRET_ACCESS_KEY'] = 'aws_secret_key'
 app.config['AWS_REGION'] = 'aws_region'
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'your_email@gmail.com'
+app.config['MAIL_PASSWORD'] = 'your_app_password'
+app.config['MAIL_DEFAULT_SENDER'] = 'your_email@gmail.com'
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -27,11 +35,14 @@ s3 = boto3.client(
     aws_secret_access_key=app.config['AWS_SECRET_ACCESS_KEY']
 )
 
+mail = Mail(app)
+
 # User model
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -109,16 +120,53 @@ def login():
 @login_required
 def mfa():
     if request.method == 'POST':
-        otp = request.form['otp']
-        if otp == session.get('otp'):
-            return redirect('/')
-        return 'Invalid OTP'
-    
-    # Generate OTP
-    otp = ''.join(random.choices(string.digits, k=6))
-    session['otp'] = otp
+        otp_entered = request.form['otp']
 
-    return render_template('mfa.html', otp=otp)
+        stored_otp = session.get('otp')
+        otp_time = session.get('otp_time')
+
+        # Check if OTP exists
+        if not stored_otp:
+            return "OTP not generated. Please retry login."
+
+        # Expiry check (5 minutes)
+        if time.time() - otp_time > 300:
+            session.pop('otp', None)
+            session.pop('otp_time', None)
+            return "OTP expired. Please login again."
+
+        # Verify OTP
+        if otp_entered == stored_otp:
+            session.pop('otp', None)
+            session.pop('otp_time', None)
+            return redirect('/')
+
+        return "Invalid OTP"
+
+   
+    otp = ''.join(random.choices(string.digits, k=6))
+
+    session['otp'] = otp
+    session['otp_time'] = time.time()
+
+    user_email = current_user.email 
+
+    msg = Message(
+        subject="Your Login OTP",
+        recipients=[user_email]
+    )
+
+    msg.body = f"""
+Your OTP for login is: {otp}
+
+This OTP is valid for 5 minutes.
+
+If you did not request this, ignore this email.
+"""
+
+    mail.send(msg)
+
+    return render_template('mfa.html')
 
 
 
