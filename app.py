@@ -151,20 +151,13 @@ def mfa():
 
     user_email = current_user.email 
 
-    msg = Message(
-        subject="Your Login OTP",
-        recipients=[user_email]
-    )
+    msg = EmailMessage(
+    subject="Your OTP",
+    body=f"Your OTP is {otp}",
+    to=[user_email]
+)
 
-    msg.body = f"""
-Your OTP for login is: {otp}
-
-This OTP is valid for 5 minutes.
-
-If you did not request this, ignore this email.
-"""
-
-    mail.send(msg)
+msg.send()
 
     return render_template('mfa.html')
 
